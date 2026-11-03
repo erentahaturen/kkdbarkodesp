@@ -1,25 +1,22 @@
-# KKD Barkod & NFC Zimmetleme Sistemi (ESP32)
+# KKD Barkod & RDM6300 RFID Zimmetleme Sistemi (ESP32)
 
-Bu proje, ardışık okutulan barkodları ESP32'nin kalıcı NVS hafızasında biriktiren ve son olarak okutulan RFID/NFC kart sahibine zimmetleyen endüstriyel gömülü yazılımdır.
+Bu proje, ardışık okutulan barkodları ESP32'nin kalıcı NVS hafızasında biriktiren ve son olarak okutulan **RDM6300 125KHz RFID** kart sahibine zimmetleyen gömülü yazılımdır.
 
 ## 📌 Pin Bağlantı Şeması
 
-| Modül / Aygıt | Fonksiyon | ESP32 GPIO | Açıklama |
+| Modül / Aygıt | Fonksiyon / Pin | ESP32 GPIO | Açıklama |
 |---|---|---|---|
 | **Barkod Okuyucu** | TX (Veri Çıkışı) | **GPIO 16 (G16)** | ESP32 HardwareSerial2 RX |
-| **RFID / NFC** | SDA / SS | **GPIO 26 (G26)** | RC522 Chip Select / Slave Select |
+| **RDM6300 RFID (125KHz)** | **TX Pini** | **GPIO 26 (G26)** | ESP32 HardwareSerial1 RX (9600 Baud) |
+| **RDM6300 RFID (125KHz)** | **VCC** | **5V** | RDM6300 5V ile beslenir |
+| **RDM6300 RFID (125KHz)** | **GND** | **GND** | Ortak Toprak Hattı |
 | **Tetik / Çıkış (LED/Röle)** | Sinyal Çıkışı | **GPIO 2 (G2)** | Barkod veya Kart okunduğunda 2 sn aktif |
 | **Ekran** | RS | **GPIO 18 (G18)** | Ekran RS Pini |
 | **Ekran** | EN | **GPIO 23 (G23)** | Ekran Enable Pini |
 | **Ekran** | D4 | **GPIO 4 (G4)** | Ekran Data 4 Pini |
 
-## ⚙️ Çalışma Mantığı
-1. Barkod okutulduğunda veri seri porttan (G16) alınır ve hafızaya `1. barkod`, `2. barkod` şeklinde eklenir.
-2. Barkod okunduğu anda `G2` pini `HIGH (1)` yapılır, 2 saniye beklenir ve `LOW (0)` durumuna geri döner.
-3. Zimmetleme aşamasında NFC/RFID kart okutulur. Kartın UID bilgisi alınır ve toplanan tüm barkodlar bu karta zimmetlenir.
-4. Kart okunduğu anda da `G2` pini `HIGH (1)` yapılır, 2 saniye beklenir ve oturum sıfırlanarak yeni döngüye geçilir.
-
-## 🚀 VS Code ile Başlatma
-1. VS Code'da `kkdbarkodesp` klasörünü açın.
-2. PlatformIO eklentisi yüklü ise alt bardan **Build (✓)** ve **Upload (→)** ikonuna tıklayın.
-3. Seri port ekranını **115200 baud** hızıyla açarak canlı logları takip edin.
+## ⚙️ RDM6300 Çalışma Mantığı
+* **RDM6300**, seri port (UART - 9600 baud) üzerinden 14 baytlık paket gönderir (`0x02` başlangıç + 10 bayt Kart ID + 2 bayt Checksum + `0x03` bitiş).
+* Kod içinde yer alan `parseRdm6300Tag` fonksiyonu checksum kontrolü yaparak kart ID'sini doğrular ve anında zimmetleme fonksiyonuna aktarır.
+* Barkod okunduğunda `G2 = 1` olur ve 2 saniye beklenir.
+* Kart okunduğunda `G2 = 1` olur, 2 saniye beklenir ve oturum başarıyla tamamlanır.

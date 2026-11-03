@@ -1,27 +1,26 @@
 #include <Arduino.h>
-#include <SPI.h>
-#include <MFRC522.h>
 #include "config.h"
 #include "storage_manager.h"
 
-// Donanımsal Seri Port 2 (Barkod Okuyucu)
+// Donanımsal Seri Port 2 (Barkod Okuyucu - GPIO16)
 HardwareSerial BarcodeSerial(2);
 
-// RFID/NFC Modülü (MFRC522)
-MFRC522 rfid(PIN_RFID_SS, PIN_RFID_RST);
+// Donanımsal Seri Port 1 (RDM6300 RFID Okuyucu - GPIO26)
+HardwareSerial RfidSerial(1);
 
 // Fonksiyon Prototipleri
 void triggerG2Output();
 void checkBarcodeReader();
-void checkRfidReader();
+void checkRdm6300Reader();
+String parseRdm6300Tag(const uint8_t *buffer);
 
 void setup() {
-    // 1. USB Seri Port (Hata Ayıklama / Debug)
+    // 1. USB Seri Port (Debug / Bilgisayar Ekranı)
     Serial.begin(SERIAL_DEBUG_BAUD);
     delay(1000);
-    Serial.println("\n--- KKD BARKOD & NFC ZIMMETLEME SISTEMI BASLATILIYOR ---");
+    Serial.println("\n--- KKD BARKOD & RDM6300 RFID ZIMMETLEME SISTEMI BASLATILIYOR ---");
 
-    // 2. G2 ve Ekran Kontrol Pinleri Ayarlanıyor
+    // 2. G2 ve Ekran Kontrol Pinleri
     pinMode(PIN_OUT_G2, OUTPUT);
     digitalWrite(PIN_OUT_G2, LOW);
 
@@ -29,36 +28,35 @@ void setup() {
     pinMode(PIN_DISP_EN, OUTPUT);
     pinMode(PIN_DISP_D4, OUTPUT);
 
-    // 3. Dahili Kalıcı Hafıza (NVS Flash) Başlatma
+    // 3. Kalıcı NVS Hafıza
     if (StorageManager::getInstance().begin()) {
-        Serial.println("[OK] Dahili NVS Flash Depolama Hazir.");
+        Serial.println("[OK] NVS Flash Depolama Hazir.");
     }
 
-    // 4. Barkod Okuyucu Donanımsal Seri Portu (GPIO 16 RX)
+    // 4. Barkod Okuyucu (UART2 - RX: GPIO16)
     BarcodeSerial.begin(BARCODE_BAUDRATE, SERIAL_8N1, PIN_BARCODE_RX, PIN_BARCODE_TX);
     Serial.printf("[OK] Barkod Okuyucu UART baslatildi (RX: GPIO%d, Baud: %d)\n", PIN_BARCODE_RX, BARCODE_BAUDRATE);
 
-    // 5. RFID / NFC Modülü (SPI - SS: GPIO 26)
-    SPI.begin(PIN_RFID_SCK, PIN_RFID_MISO, PIN_RFID_MOSI, PIN_RFID_SS);
-    rfid.PCD_Init();
-    Serial.printf("[OK] RFID Modulu baslatildi (SDA/SS: GPIO%d)\n", PIN_RFID_SS);
+    // 5. RDM6300 125KHz RFID Okuyucu (UART1 - RX: GPIO26)
+    RfidSerial.begin(RDM6300_BAUDRATE, SERIAL_8N1, PIN_RDM6300_RX, PIN_RDM6300_TX);
+    Serial.printf("[OK] RDM6300 RFID UART baslatildi (RX: GPIO%d, Baud: %d)\n", PIN_RDM6300_RX, RDM6300_BAUDRATE);
 
-    Serial.println("Sistem hazir! Barkod okutabilir veya Kart yaklastirabilirsiniz...\n");
+    Serial.println("Sistem hazir! Barkod okutabilir veya RDM6300'e 125KHz Kart yaklastirabilirsiniz...\n");
 }
 
 void loop() {
-    // Barkod okuyucuyu dinle
+    // Barkod okuyucuyu dinle (GPIO16)
     checkBarcodeReader();
 
-    // RFID / NFC okuyucuyu dinle
-    checkRfidReader();
+    // RDM6300 kart okuyucuyu dinle (GPIO26)
+    checkRdm6300Reader();
 
-    delay(20); // İşlemciyi rahatlatmak için kısa döngü gecikmesi
+    delay(10);
 }
 
 // -------------------------------------------------------------
 // G2 Sinyal Çıkışı & 2 Saniye Bekleme Döngüsü
-// (İstediğin mantık: eger barkod/kart 1 -> yaz G2 1 -> bekle 2)
+// (Kural: eger barkod/kart 1 -> yaz G2 1 -> bekle 2)
 // -------------------------------------------------------------
 void triggerG2Output() {
     Serial.println("--> G2 Pini HIGH (1) yapildi. (2 saniye bekleniyor...)");
@@ -69,58 +67,92 @@ void triggerG2Output() {
 }
 
 // -------------------------------------------------------------
-// Barkod Okuma İşlemi
+// Barkod Okuma İşlemi (GPIO16)
 // -------------------------------------------------------------
 void checkBarcodeReader() {
     if (BarcodeSerial.available()) {
         String barcodeData = BarcodeSerial.readStringUntil('\n');
-        barcodeData.trim(); // Boşluk ve \r temizle
+        barcodeData.trim();
 
         if (barcodeData.length() > 0) {
-            // Hafızaya ekle
             StorageManager::getInstance().addBarcode(barcodeData);
             size_t count = StorageManager::getInstance().getBarcodeCount();
 
-            Serial.printf("[+] %d. BARKOD OKUNDU: %s\n", (int)count, barcodeData.c_str());
+            Serial.printf("[+] %d. BARKOD OKUNDU (G16): %s\n", (int)count, barcodeData.c_str());
 
-            // İstediğin kural: Barkod okunduğunda G2 = 1, 2 sn bekle
+            // Tetik çıkışı: G2 = 1, 2 sn bekle
             triggerG2Output();
         }
     }
 }
 
 // -------------------------------------------------------------
-// RFID / NFC Kart Okuma ve Zimmetleme İşlemi
+// RDM6300 125KHz RFID Okuma İşlemi (GPIO26)
+// RDM6300 Protokolü: 14 Byte Paket [0x02 (Başlangıç), 10 Byte Veri, 2 Byte Checksum, 0x03 (Bitiş)]
 // -------------------------------------------------------------
-void checkRfidReader() {
-    // Yeni kart var mı?
-    if (!rfid.PICC_IsNewCardPresent()) {
-        return;
+void checkRdm6300Reader() {
+    static uint8_t buffer[14];
+    static uint8_t index = 0;
+
+    while (RfidSerial.available()) {
+        uint8_t incomingByte = RfidSerial.read();
+
+        // Başlangıç baytı (0x02 - STX)
+        if (incomingByte == 0x02) {
+            index = 0;
+            buffer[index++] = incomingByte;
+            continue;
+        }
+
+        // Paket toplanıyor
+        if (index > 0 && index < 14) {
+            buffer[index++] = incomingByte;
+
+            // 14 byte tamamlandı mı?
+            if (index == 14) {
+                // Bitiş baytı kontrolü (0x03 - ETX)
+                if (buffer[13] == 0x03) {
+                    String cardId = parseRdm6300Tag(buffer);
+                    if (cardId.length() > 0) {
+                        Serial.printf("[RDM6300] 125KHz KART OKUNDU (G26)! KART ID: %s\n", cardId.c_str());
+
+                        // Kart sahibine mevcut barkodları zimmetle
+                        StorageManager::getInstance().finalizeAssignment(cardId);
+
+                        // Kart okunduğunda G2 = 1, 2 sn bekle
+                        triggerG2Output();
+                    }
+                }
+                index = 0; // Bir sonraki okuma için sıfırla
+            }
+        }
+    }
+}
+
+// -------------------------------------------------------------
+// RDM6300 Paket Doğrulama (Checksum) ve Kart ID Ayıklama
+// -------------------------------------------------------------
+String parseRdm6300Tag(const uint8_t *buf) {
+    char tagStr[11];
+    for (int i = 0; i < 10; i++) {
+        tagStr[i] = (char)buf[1 + i];
+    }
+    tagStr[10] = '\0';
+
+    // Checksum Doğrulaması
+    uint8_t checksum = 0;
+    for (int i = 0; i < 5; i++) {
+        char byteHex[3] = { (char)buf[1 + (i * 2)], (char)buf[2 + (i * 2)], '\0' };
+        checksum ^= (uint8_t)strtol(byteHex, NULL, 16);
     }
 
-    // Kart UID okunabiliyor mu?
-    if (!rfid.PICC_ReadCardSerial()) {
-        return;
+    char chkHex[3] = { (char)buf[11], (char)buf[12], '\0' };
+    uint8_t receivedChecksum = (uint8_t)strtol(chkHex, NULL, 16);
+
+    if (checksum == receivedChecksum) {
+        return String(tagStr); // Doğrulanmış geçerli Kart Numarası
+    } else {
+        Serial.println("[HATA] RDM6300 Checksum hatasi!");
+        return "";
     }
-
-    // UID Hex Dizesine Dönüştürülüyor
-    String cardUid = "";
-    for (byte i = 0; i < rfid.uid.size; i++) {
-        cardUid += (rfid.uid.uidByte[i] < 0x10 ? "0" : "");
-        cardUid += String(rfid.uid.uidByte[i], HEX);
-        if (i < rfid.uid.size - 1) cardUid += ":";
-    }
-    cardUid.toUpperCase();
-
-    Serial.printf("[NFC] KART OKUNDU! UID: %s\n", cardUid.c_str());
-
-    // Kart sahibine mevcut barkodları zimmetle
-    StorageManager::getInstance().finalizeAssignment(cardUid);
-
-    // Kart okunduğunda G2 = 1, 2 sn bekle
-    triggerG2Output();
-
-    // Kart okuyucuyu boşa çıkar
-    rfid.PICC_HaltA();
-    rfid.PCD_StopCrypto1();
 }

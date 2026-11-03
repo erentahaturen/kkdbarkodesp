@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KKD Barkod & NFC Zimmetleme - Canlı Önizleme / Simülatör</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --border-color: #334155;
+            --accent-blue: #38bdf8;
+            --accent-green: #22c55e;
+            --accent-orange: #f97316;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            padding: 24px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            max-width: 1000px;
+            width: 100%;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .full-width {
+            grid-column: 1 / -1;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1e293b, #0f172a);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 20px;
+            color: var(--accent-blue);
+        }
+
+        .status-badge {
+            background: rgba(34, 197, 94, 0.15);
+            color: var(--accent-green);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent-green);
+            box-shadow: 0 0 8px var(--accent-green);
+        }
+
+        .card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+
+        .card h2 {
+            font-size: 16px;
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-main);
+        }
+
+        /* G2 Pin Indicator */
+        .pin-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px;
+            background: #0f172a;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 14px;
+        }
+
+        .pin-light {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #475569;
+            transition: all 0.3s ease;
+        }
+
+        .pin-light.active {
+            background: var(--accent-green);
+            box-shadow: 0 0 16px var(--accent-green);
+        }
+
+        /* Input Controls */
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        input {
+            flex: 1;
+            padding: 10px 14px;
+            border-radius: 6px;
+            background: #0f172a;
+            border: 1px solid var(--border-color);
+            color: white;
+            font-size: 14px;
+            outline: none;
+        }
+
+        input:focus {
+            border-color: var(--accent-blue);
+        }
+
+        button {
+            padding: 10px 16px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            transition: opacity 0.2s;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        .btn-primary {
+            background: var(--accent-blue);
+            color: #0f172a;
+        }
+
+        .btn-orange {
+            background: var(--accent-orange);
+            color: white;
+        }
+
+        /* Barcode List */
+        .barcode-list {
+            list-style: none;
+            max-height: 180px;
+            overflow-y: auto;
+            background: #0f172a;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            padding: 8px;
+        }
+
+        .barcode-item {
+            padding: 8px 12px;
+            background: #1e293b;
+            border-radius: 6px;
+            margin-bottom: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14px;
+            border-left: 3px solid var(--accent-blue);
+        }
+
+        .empty-placeholder {
+            text-align: center;
+            color: var(--text-muted);
+            padding: 20px;
+            font-size: 13px;
+        }
+
+        /* Terminal Console */
+        .console {
+            background: #050b14;
+            border-radius: 8px;
+            padding: 12px;
+            font-family: "Courier New", Courier, monospace;
+            font-size: 13px;
+            height: 180px;
+            overflow-y: auto;
+            color: #38bdf8;
+            border: 1px solid var(--border-color);
+        }
+
+        .log-entry {
+            margin-bottom: 4px;
+            line-height: 1.4;
+        }
+
+        .log-success { color: var(--accent-green); }
+        .log-warn { color: var(--accent-orange); }
+
+        /* Quick Barcodes */
+        .quick-tags {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-top: 8px;
+        }
+
+        .tag-btn {
+            background: #334155;
+            color: #cbd5e1;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            border: none;
+        }
+        .tag-btn:hover { background: #475569; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- Header -->
+    <div class="header full-width">
+        <div>
+            <h1>ESP32 KKD Barkod & NFC Zimmetleme Simülatörü</h1>
+            <p style="color: var(--text-muted); font-size: 13px; margin-top: 4px;">HardwareSerial (G16) & RFID RC522 (G26) & Sinyal Çıkışı (G2)</p>
+        </div>
+        <div class="status-badge">
+            <span class="status-dot"></span>
+            Simülasyon Aktif
+        </div>
+    </div>
+
+    <!-- Donanım Durumu (G2 Pini) -->
+    <div class="card full-width">
+        <h2>⚡ ESP32 GPIO Donanım Durumu</h2>
+        <div class="pin-indicator">
+            <div>
+                <strong>G2 Pini (Çıkış):</strong> <span id="g2StateText" style="color: var(--text-muted); font-weight: bold;">0 (LOW / Pasif)</span>
+                <p style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">Kural: Barkod veya Kart okunduğunda G2 = 1 yapılır, 2 saniye beklenir.</p>
+            </div>
+            <div id="g2Light" class="pin-light"></div>
+        </div>
+    </div>
+
+    <!-- 1. BARKOD OKUYUCU (G16) -->
+    <div class="card">
+        <h2>📦 1. Barkod Okuyucu (G16)</h2>
+        <div class="input-group">
+            <input type="text" id="barcodeInput" placeholder="Örn: BARKOD-98231..." onkeydown="if(event.key==='Enter') readBarcode()">
+            <button class="btn-primary" onclick="readBarcode()">Oku (G16)</button>
+        </div>
+        <div class="quick-tags">
+            <span style="font-size: 12px; color: var(--text-muted); align-self: center;">Örnek:</span>
+            <button class="tag-btn" onclick="quickBarcode('KKD-BARET-01')">Baret</button>
+            <button class="tag-btn" onclick="quickBarcode('KKD-YELIK-44')">Yelek</button>
+            <button class="tag-btn" onclick="quickBarcode('KKD-ELDVN-09')">Eldiven</button>
+        </div>
+
+        <h3 style="font-size: 13px; margin: 16px 0 8px; color: var(--text-muted);">ESP32 Hafızasındaki Barkodlar:</h3>
+        <ul id="barcodeList" class="barcode-list">
+            <li class="empty-placeholder">Henüz barkod okunmadı.</li>
+        </ul>
+    </div>
+
+    <!-- 2. NFC / RFID KART OKUYUCU (G26) -->
+    <div class="card">
+        <h2>💳 2. NFC / RFID Kart Okuyucu (G26)</h2>
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">Kart okutulduğunda toplanan tüm barkodlar kart sahibine zimmetlenir.</p>
+        <div class="input-group">
+            <input type="text" id="cardInput" placeholder="Kart UID (Örn: A4:3B:19:D2)" value="A4:3B:19:D2">
+            <button class="btn-orange" onclick="readCard()">Kartı Okut (Zimmetle)</button>
+        </div>
+
+        <div class="quick-tags" style="margin-top: 10px;">
+            <span style="font-size: 12px; color: var(--text-muted); align-self: center;">Personel Kartları:</span>
+            <button class="tag-btn" onclick="setCard('A4:3B:19:D2')">Ahmet Yılmaz</button>
+            <button class="tag-btn" onclick="setCard('6F:89:C1:0A')">Mehmet Kaya</button>
+        </div>
+
+        <div style="margin-top: 24px; padding: 12px; background: #0f172a; border-radius: 8px; border: 1px solid var(--border-color);">
+            <div style="font-size: 12px; color: var(--text-muted);">Son Zimmetleme:</div>
+            <div id="lastAssignment" style="font-size: 14px; font-weight: bold; margin-top: 4px; color: var(--accent-green);">-</div>
+        </div>
+    </div>
+
+    <!-- CANLI LOG / SERIAL MONITOR -->
+    <div class="card full-width">
+        <h2>💻 ESP32 Seri Port Canlı Çıktısı (Serial Monitor - 115200 Baud)</h2>
+        <div id="terminal" class="console">
+            <div class="log-entry">[ESP32 BOOT] KKD Barkod & NFC Sistemi Baslatildi...</div>
+            <div class="log-entry">[OK] NVS Flash Bellek Hazir.</div>
+            <div class="log-entry">[OK] Barkod RX: GPIO16, RFID SS: GPIO26, Tetik: GPIO2</div>
+            <div class="log-entry">[INFO] Sistem dinlemede. Barkod okutun veya Kart yaklastirin...</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let barcodes = [];
+    let isPulseActive = false;
+
+    function log(message, type = '') {
+        const terminal = document.getElementById('terminal');
+        const entry = document.createElement('div');
+        entry.className = 'log-entry ' + type;
+        const time = new Date().toLocaleTimeString();
+        entry.textContent = `[${time}] ${message}`;
+        terminal.appendChild(entry);
+        terminal.scrollTop = terminal.scrollHeight;
+    }
+
+    // G2 Pinini 2 Saniye Boyunca 1 Yapma Fonksiyonu
+    function triggerG2() {
+        if (isPulseActive) return;
+        isPulseActive = true;
+
+        const g2Light = document.getElementById('g2Light');
+        const g2Text = document.getElementById('g2StateText');
+
+        g2Light.classList.add('active');
+        g2Text.textContent = "1 (HIGH / Aktif - 2 Saniye Sayıyor)";
+        g2Text.style.color = "var(--accent-green)";
+        log("--> G2 Pini HIGH (1) yapildi. (2 saniye bekleniyor...)", "log-warn");
+
+        setTimeout(() => {
+            g2Light.classList.remove('active');
+            g2Text.textContent = "0 (LOW / Pasif)";
+            g2Text.style.color = "var(--text-muted)";
+            log("--> G2 Pini LOW (0) yapildi.", "log-warn");
+            isPulseActive = false;
+        }, 2000);
+    }
+
+    function quickBarcode(code) {
+        document.getElementById('barcodeInput').value = code;
+        readBarcode();
+    }
+
+    function setCard(uid) {
+        document.getElementById('cardInput').value = uid;
+    }
+
+    // 1. Barkod Okuma Fonksiyonu
+    function readBarcode() {
+        const input = document.getElementById('barcodeInput');
+        const val = input.value.trim();
+        if (!val) return;
+
+        barcodes.push(val);
+        input.value = '';
+
+        log(`[+] ${barcodes.length}. BARKOD OKUNDU (G16): ${val}`, "log-success");
+        renderBarcodeList();
+        triggerG2();
+    }
+
+    function renderBarcodeList() {
+        const list = document.getElementById('barcodeList');
+        if (barcodes.length === 0) {
+            list.innerHTML = '<li class="empty-placeholder">Henüz barkod okunmadı.</li>';
+            return;
+        }
+
+        list.innerHTML = '';
+        barcodes.forEach((b, idx) => {
+            const li = document.createElement('li');
+            li.className = 'barcode-item';
+            li.innerHTML = `<span><strong>${idx + 1}.</strong> ${b}</span> <span style="font-size:12px; color:var(--text-muted)">ESP32 NVS</span>`;
+            list.appendChild(li);
+        });
+    }
+
+    // 2. Kart Okuma ve Zimmetleme Fonksiyonu
+    function readCard() {
+        const cardUid = document.getElementById('cardInput').value.trim();
+        if (!cardUid) {
+            alert("Lütfen bir kart UID girin!");
+            return;
+        }
+
+        if (barcodes.length === 0) {
+            log(`[UYARI] Kart okundu (${cardUid}) fakat hafızada zimmetlenecek barkod yok!`, "log-warn");
+            triggerG2();
+            return;
+        }
+
+        log(`[NFC] KART OKUNDU (G26)! UID: ${cardUid}`, "log-success");
+        log(`========================================`, "log-success");
+        log(`>>> ZIMMETLEME TAMAMLANDI <<<`, "log-success");
+        log(`Kart UID: ${cardUid}`, "log-success");
+        log(`Toplam Zimmetlenen: ${barcodes.length} adet barkod`, "log-success");
+        barcodes.forEach((b, i) => {
+            log(`  [${i + 1}] ${b}`, "log-success");
+        });
+        log(`========================================`, "log-success");
+
+        document.getElementById('lastAssignment').textContent = `${cardUid} kartına ${barcodes.length} ürün zimmetlendi!`;
+
+        // Hafızayı Sıfırla
+        barcodes = [];
+        renderBarcodeList();
+        triggerG2();
+    }
+</script>
+
+</body>
+</html>

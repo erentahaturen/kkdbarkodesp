@@ -1,22 +1,25 @@
-# KKD Barkod & RDM6300 RFID Zimmetleme Sistemi (ESP32)
+# KKD Barkod & RDM6300 RFID & ST7789 Ekran Sistemi (ESP32)
 
-Bu proje, ardışık okutulan barkodları ESP32'nin kalıcı NVS hafızasında biriktiren ve son olarak okutulan **RDM6300 125KHz RFID** kart sahibine zimmetleyen gömülü yazılımdır.
+Bu proje; **Barkod Okuyucu**, **RDM6300 125KHz RFID Okuyucu** ve **ST7789 240x240 IPS Renkli Ekran** bileşenlerini içeren endüstriyel zimmetleme yazılımıdır.
 
-## 📌 Pin Bağlantı Şeması
+## 📌 Tam Pin Bağlantı Şeması
 
-| Modül / Aygıt | Fonksiyon / Pin | ESP32 GPIO | Açıklama |
+| Modül / Aygıt | Modül Pini | ESP32 GPIO | Açıklama |
 |---|---|---|---|
-| **Barkod Okuyucu** | TX (Veri Çıkışı) | **GPIO 16 (G16)** | ESP32 HardwareSerial2 RX |
-| **RDM6300 RFID (125KHz)** | **TX Pini** | **GPIO 26 (G26)** | ESP32 HardwareSerial1 RX (9600 Baud) |
-| **RDM6300 RFID (125KHz)** | **VCC** | **5V** | RDM6300 5V ile beslenir |
-| **RDM6300 RFID (125KHz)** | **GND** | **GND** | Ortak Toprak Hattı |
-| **Tetik / Çıkış (LED/Röle)** | Sinyal Çıkışı | **GPIO 2 (G2)** | Barkod veya Kart okunduğunda 2 sn aktif |
-| **Ekran** | RS | **GPIO 18 (G18)** | Ekran RS Pini |
-| **Ekran** | EN | **GPIO 23 (G23)** | Ekran Enable Pini |
-| **Ekran** | D4 | **GPIO 4 (G4)** | Ekran Data 4 Pini |
+| **Barkod Okuyucu** | TX | **GPIO 16 (G16)** | HardwareSerial2 RX |
+| **Barkod Okuyucu** | GND | **GND** | Ortak Toprak |
+| **RDM6300 RFID** | TX | **GPIO 26 (G26)** | HardwareSerial1 RX (9600 Baud) |
+| **RDM6300 RFID** | VCC | **5V** | 5V Güç Beslemesi |
+| **RDM6300 RFID** | GND | **GND** | Ortak Toprak |
+| **ST7789 Ekran** | **SCL / SCK** | **GPIO 18 (G18)** | Donanımsal SPI Saat Hattı |
+| **ST7789 Ekran** | **SDA / MOSI** | **GPIO 23 (G23)** | Donanımsal SPI Veri Hattı |
+| **ST7789 Ekran** | **DC (Data/Command)** | **GPIO 4 (G4)** | Komut / Veri Seçim Pini |
+| **ST7789 Ekran** | **RES / RST** | **3.3V veya EN** | Reset Pini (Yazılımsal -1) |
+| **ST7789 Ekran** | **BLK / LED** | **3.3V** | Ekran Arka Işığı |
+| **ST7789 Ekran** | **VCC / GND** | **3.3V / GND** | Güç Beslemesi |
+| **Tetik Çıkışı** | Sinyal | **GPIO 2 (G2)** | Barkod/Kart okunduğunda 2 sn aktif |
 
-## ⚙️ RDM6300 Çalışma Mantığı
-* **RDM6300**, seri port (UART - 9600 baud) üzerinden 14 baytlık paket gönderir (`0x02` başlangıç + 10 bayt Kart ID + 2 bayt Checksum + `0x03` bitiş).
-* Kod içinde yer alan `parseRdm6300Tag` fonksiyonu checksum kontrolü yaparak kart ID'sini doğrular ve anında zimmetleme fonksiyonuna aktarır.
-* Barkod okunduğunda `G2 = 1` olur ve 2 saniye beklenir.
-* Kart okunduğunda `G2 = 1` olur, 2 saniye beklenir ve oturum başarıyla tamamlanır.
+## 🖥️ ST7789 Ekran Arayüzü
+1. **Bekleme Modu:** "KKD TAKIP SISTEMI - SISTEM HAZIR"
+2. **Barkod Okunduğunda:** Yeşil tema ile okunan ürün sayısı ve barkod kodu ekranda gösterilir.
+3. **Kart Okunduğunda:** Mavi/Yeşil tema ile Kart ID'si ve toplam zimmetlenen ürün adedi ekranda raporlanır.

@@ -1,16 +1,19 @@
 # KKD Barkod, RDM6300 RFID ve ST7789 Ekran Sistemi (ESP32)
 
-Bu proje; **MH-ET LIVE Barkod Okuyucu**, **RDM6300 125KHz RFID Kart Okuyucu** ve **ST7789 240x240 IPS Renkli Ekran** ile çalışan endüstriyel zimmetleme yazılımıdır.
+Bu proje; **MH-ET LIVE Barkod Okuyucu (V3.0)**, **RDM6300 125KHz RFID Kart Okuyucu** ve **ST7789 240x240 IPS Renkli Ekran** ile çalışan endüstriyel zimmetleme yazılımıdır.
 
 ## 📌 Tam Pin ve Bağlantı Tablosu
 
-### 1. MH-ET LIVE Barkod Okuyucu
-| Modül Pini | Kablo Rengi | ESP32 GPIO / Güç | Açıklama |
-|---|---|---|---|
-| **5V** | 🔴 Kırmızı | **5V (VIN)** | 5V Güç Beslemesi |
-| **GND** | ⚫ Siyah | **GND** | Ortak Toprak Hattı |
-| **TX** | 🟣 Mor | **GPIO 16 (G16)** | ESP32 HardwareSerial2 RX |
-| **RX** | 🟠 Turuncu | **GPIO 17 (G17)** | ESP32 HardwareSerial2 TX (Opsiyonel) |
+### 1. MH-ET LIVE Barkod Okuyucu Modülü
+> **ÖNEMLİ:** MH-ET LIVE kartında Seri TX/RX pinleri üretici tarafından **SDA / SCL** olarak etiketlenmiştir.
+
+| Modül Pini | ESP32 GPIO / Güç | Açıklama |
+|---|---|---|
+| **VDD** | **5V (VIN)** veya **3.3V** | Güç Beslemesi |
+| **GND** | **GND** | Ortak Toprak Hattı |
+| **SDA (Modül TX)** | **GPIO 16 (G16)** | **Asıl Veri Hattı:** Barkod okununca ESP32 RX2 (G16) pinine akar |
+| **SCL (Modül RX)** | **GPIO 17 (G17)** | ESP32 TX2 pini (Opsiyonel / boş bırakılabilir) |
+| **RST** | **Boşta (NC)** | Bağlanmaz |
 
 ### 2. RDM6300 RFID Kart Okuyucu (125KHz)
 | Modül Pini | ESP32 GPIO / Güç | Açıklama |
@@ -36,7 +39,7 @@ Bu proje; **MH-ET LIVE Barkod Okuyucu**, **RDM6300 125KHz RFID Kart Okuyucu** ve
 ---
 
 ## ⚙️ Çalışma Akışı
-1. **MH-ET LIVE** modülünden bir barkod okutulduğunda veri `G16` üzerinden yakalanır.
+1. **MH-ET LIVE** modülünden bir barkod okutulduğunda veri modülün `SDA` bacağından ESP32 `G16` pinine akar.
 2. ST7789 ekranda okunan ürün sayısı yeşil renkte gösterilir.
 3. `G2` pini 2 saniye boyunca aktif edilir.
 4. İstenen sayıda barkod okutulduktan sonra **RDM6300** modülüne 125KHz personel kartı yaklaştırılır.

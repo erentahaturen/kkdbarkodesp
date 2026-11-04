@@ -4,7 +4,7 @@
 #include "storage_manager.h"
 #include "display_manager.h"
 
-// Donanımsal Seri Port 2 (Barkod Okuyucu - GPIO16)
+// Donanımsal Seri Port 2 (MH-ET LIVE Barkod Okuyucu - GPIO16)
 HardwareSerial BarcodeSerial(2);
 
 // Donanımsal Seri Port 1 (RDM6300 RFID Okuyucu - GPIO26)
@@ -36,11 +36,11 @@ void setup() {
         Serial.println("[OK] NVS Flash Bellek Hazir.");
     }
 
-    // 5. Barkod Okuyucu (UART2 - RX: GPIO16)
+    // 5. MH-ET LIVE Barkod Okuyucu (UART2 - RX: GPIO16 <- Modül SDA)
     BarcodeSerial.begin(BARCODE_BAUDRATE, SERIAL_8N1, PIN_BARCODE_RX, PIN_BARCODE_TX);
-    Serial.printf("[OK] Barkod Okuyucu UART baslatildi (RX: GPIO%d, Baud: %d)\n", PIN_BARCODE_RX, BARCODE_BAUDRATE);
+    Serial.printf("[OK] MH-ET LIVE UART baslatildi (RX: GPIO%d <- Modul SDA, Baud: %d)\n", PIN_BARCODE_RX, BARCODE_BAUDRATE);
 
-    // 6. RDM6300 125KHz RFID Okuyucu (UART1 - RX: GPIO26)
+    // 6. RDM6300 125KHz RFID Okuyucu (UART1 - RX: GPIO26 <- Modül TX)
     RfidSerial.begin(RDM6300_BAUDRATE, SERIAL_8N1, PIN_RDM6300_RX, PIN_RDM6300_TX);
     Serial.printf("[OK] RDM6300 RFID UART baslatildi (RX: GPIO%d, Baud: %d)\n", PIN_RDM6300_RX, RDM6300_BAUDRATE);
 
@@ -48,7 +48,7 @@ void setup() {
 }
 
 void loop() {
-    // Barkod okuyucuyu dinle (GPIO16)
+    // MH-ET LIVE barkod okuyucuyu dinle (GPIO16 <- SDA)
     checkBarcodeReader();
 
     // RDM6300 kart okuyucuyu dinle (GPIO26)
@@ -70,24 +70,34 @@ void triggerG2Output() {
 }
 
 // -------------------------------------------------------------
-// Barkod Okuma İşlemi (GPIO16)
+// MH-ET LIVE Barkod Okuma İşlemi (G16 <- SDA)
+// Karakter bazlı tamponlama ile CR / LF / Enter uyumluluğu
 // -------------------------------------------------------------
 void checkBarcodeReader() {
-    if (BarcodeSerial.available()) {
-        String barcodeData = BarcodeSerial.readStringUntil('\n');
-        barcodeData.trim();
+    static String barcodeBuffer = "";
 
-        if (barcodeData.length() > 0) {
-            StorageManager::getInstance().addBarcode(barcodeData);
-            size_t count = StorageManager::getInstance().getBarcodeCount();
+    while (BarcodeSerial.available()) {
+        char c = (char)BarcodeSerial.read();
 
-            Serial.printf("[+] %d. BARKOD OKUNDU (G16): %s\n", (int)count, barcodeData.c_str());
+        // Satır sonu veya Enter geldi mi?
+        if (c == '\r' || c == '\n') {
+            barcodeBuffer.trim();
 
-            // ST7789 Ekrana Yazdır
-            DisplayManager::getInstance().showBarcodeRead(count, barcodeData);
+            if (barcodeBuffer.length() > 0) {
+                StorageManager::getInstance().addBarcode(barcodeBuffer);
+                size_t count = StorageManager::getInstance().getBarcodeCount();
 
-            // Tetik: G2 = 1, 2 sn bekle
-            triggerG2Output();
+                Serial.printf("[+] %d. BARKOD OKUNDU (MH-ET LIVE SDA -> G16): %s\n", (int)count, barcodeBuffer.c_str());
+
+                // ST7789 Ekrana Yazdır
+                DisplayManager::getInstance().showBarcodeRead(count, barcodeBuffer);
+
+                // Tetik: G2 = 1, 2 sn bekle
+                triggerG2Output();
+            }
+            barcodeBuffer = ""; // Tamponu sıfırla
+        } else {
+            barcodeBuffer += c;
         }
     }
 }
@@ -102,14 +112,12 @@ void checkRdm6300Reader() {
     while (RfidSerial.available()) {
         uint8_t incomingByte = RfidSerial.read();
 
-        // Başlangıç baytı (0x02 - STX)
         if (incomingByte == 0x02) {
             index = 0;
             buffer[index++] = incomingByte;
             continue;
         }
 
-        // Paket toplanıyor
         if (index > 0 && index < 14) {
             buffer[index++] = incomingByte;
 
@@ -120,16 +128,15 @@ void checkRdm6300Reader() {
                         int totalCount = StorageManager::getInstance().getBarcodeCount();
                         Serial.printf("[RDM6300] 125KHz KART OKUNDU (G26)! KART ID: %s\n", cardId.c_str());
 
-                        // ST7789 Ekrana Zimmetleme Raporunu Bas
+                        // ST7789 Ekrana Rapor Bas
                         DisplayManager::getInstance().showCardAssigned(cardId, totalCount);
 
-                        // Kart sahibine mevcut barkodları zimmetle
+                        // Kart sahibine zimmetle
                         StorageManager::getInstance().finalizeAssignment(cardId);
 
                         // Tetik: G2 = 1, 2 sn bekle
                         triggerG2Output();
 
-                        // 3 saniye sonra ekranı başlangıç moduna al
                         delay(1000);
                         DisplayManager::getInstance().showIdleScreen();
                     }

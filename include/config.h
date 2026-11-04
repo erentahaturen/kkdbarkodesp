@@ -6,10 +6,13 @@
 // PIN TANIMLAMALARI (Donanım Haritası)
 // ==========================================
 
-// MH-ET LIVE Barkod & QR Kod Okuyucu Modülü (UART2)
-#define PIN_BARCODE_RX      16  // ESP32 GPIO16 (G16) <- MH-ET LIVE "TX" pini (Mor Kablo)
-#define PIN_BARCODE_TX      17  // ESP32 GPIO17 (G17) -> MH-ET LIVE "RX" pini (Turuncu Kablo)
-#define BARCODE_BAUDRATE    9600 // MH-ET LIVE varsayılan fabrika baud hızı
+// MH-ET LIVE Barkod Okuyucu Modülü (UART2)
+// DİKKAT: MH-ET LIVE üzerinde TX/RX yerine SDA/SCL yazar:
+// Modül "SDA" pini -> ESP32 GPIO16 (RX2)
+// Modül "SCL" pini -> ESP32 GPIO17 (TX2)
+#define PIN_BARCODE_RX      16  // ESP32 GPIO16 (G16) <- MH-ET LIVE "SDA" pini
+#define PIN_BARCODE_TX      17  // ESP32 GPIO17 (G17) -> MH-ET LIVE "SCL" pini
+#define BARCODE_BAUDRATE    9600 // MH-ET LIVE fabrika varsayılan baud hızı
 
 // RDM6300 125KHz RFID Kart Okuyucu (UART1 / Seri İletişim)
 #define PIN_RDM6300_RX      26  // ESP32 GPIO26 (G26) <- RDM6300 "TX" pini
